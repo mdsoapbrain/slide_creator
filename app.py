@@ -71,7 +71,26 @@ def summarize_text(text):
         print("Request send to OpenAI API")
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": f"Please summarize, and devide into 5 sections (abstract, introductoin, methods, results, and discussion) in the following text: {chunk}"},
+            {"role": "user", "content": f"Please summarize, and devide into 5 sections (abstract, introductoin, methods, results, and discussion) with section title begins with * in the following text: {chunk}"},
+        ]
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            messages=messages
+        )
+        summarized_text += response['choices'][0]['message']['content']
+        print("Response from OpenAI API received!")
+    return summarized_text
+
+# Summarize text function
+def summarize_text_2(text):
+    chunk_size = 15000
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+    summarized_text = ""
+    for chunk in stqdm(chunks):
+        print("Request send to OpenAI API")
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": f"Please summarize, and devide into 5 sections (abstract, introduction, methods, results, and discussion) in the following text: {chunk}"},
         ]
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo-16k",
@@ -87,7 +106,7 @@ def auto_generate_slides(summarized_text: str) -> str:
     slide_structure = ""
 
     for chunk in stqdm(chunks):
-        user_message = f"Assuming you are a researcher, please summarize the {chunk} systematically into the first study according to the sections, and create a 20 pages slide structure (Slide number as title, and '#' as contents), the content should be academic in your language."
+        user_message = f"Assuming you are a researcher, please summarize the {chunk} systematically into the first study according to the sections, and must create a 6~10 pages slide structure with 5 points each slide. (Slide number as title, and '-' as contents), the content should be academic in your language."
         response = openai.ChatCompletion.create(
             model='gpt-3.5-turbo-16k',
             messages=[
@@ -113,6 +132,47 @@ def process_text(text, file_path):
         f.write(summarized_text)
 
     return summarized_text
+
+def organize_text(text):
+    text_list = text.strip(' ').split('*')
+    res_dict = {}
+    for i in text_list:
+        head = i.split(":")[0].strip(" ")
+        body = ":".join(i.split(":")[1:]).replace("\n", " ")
+        if head not in res_dict:
+            res_dict[head] = [body]
+        else:
+            res_dict[head].append(body)
+
+    res_str = ""
+    for k, v in res_dict.items():
+        res_str += f"{k}\n"
+        v_str = '\n'.join(v)
+        res_str += f"{v_str}" + "\n\n"
+
+    return res_str
+
+def organize_text_2(text):
+    text_list = text.strip(' ').split('*')
+    res_dict = {}
+    defined_headers = ["abstract", "introduction", "method", "result", "discussion"]
+    for i in text_list:
+        head = i.split(":")[0].strip(" ")
+        body = ":".join(i.split(":")[1:]).replace("\n", " ")
+        for tmp_head in defined_headers:
+            if tmp_head in head.lower():
+                if tmp_head in res_dict:
+                    res_dict[tmp_head].append(body)
+                else:
+                    res_dict[tmp_head] = [body]
+
+    res_str = ""
+    for k, v in res_dict.items():
+        res_str += f"{k}\n"
+        v_str = '\n'.join(v)
+        res_str += f"{v_str}" + "\n\n"
+
+    return res_str
 
 def load_pdf_file(pdf_path):
     # creating a pdf file object
@@ -157,11 +217,20 @@ Our system is built on leading technologies:
             with st.spinner("Cleaning text"):
                 text_cleaned = remove_references(text)
                 summarized_text_initial = process_text(text_cleaned, file_path="sum1.txt")
-                summarized_text = process_text(summarized_text_initial, file_path="sum2.txt")     
+                summarized_text_grouped = organize_text_2(summarized_text_initial)
+                print("!" * 50)
+                print(summarized_text_grouped)
+
+                with open("sum12.txt", "w") as f:
+                    f.write(summarized_text_grouped)
+
+                summarized_text = summarized_text_grouped
+                # summarized_text = process_text(summarized_text_initial, file_path="sum2.txt")     
                 st.session_state["summarized_text"] = summarized_text
                 st.session_state["preprocessed"] = True
 
-        st.write(summarized_text)
+        with st.expander("Click to see the summarized content"):
+            st.write(summarized_text)
         # Create a download button for the summarized text
         st.download_button(
             "Download summarized text",
@@ -174,7 +243,6 @@ Our system is built on leading technologies:
         ppt_title = st.text_input("PPT title", value="Your subject")
         with st.spinner("Splitting text"):
             store_name = pdf.name[:-4]
-        st.write(f'{store_name}')
 
         with st.spinner("Auto-generating slides"):
             # Get the summarized text
@@ -188,7 +256,10 @@ Our system is built on leading technologies:
 
         # Use the first 10 lines as input to auto_generate_slides
         slides = auto_generate_slides(input_text)
-        st.write(slides)
+        with st.expander("Click to see the content of the slides"):
+            st.write(f'Name of the file uploaded: {store_name}')
+            st.write(slides)
+
         with open("tmp_slides.txt", "w") as f:
             f.write(slides)
 
@@ -196,24 +267,53 @@ Our system is built on leading technologies:
             content = f.read()
         
         content_list = content.split('\n')
-        print(content_list)
+
         slide_contents = []
         track_dict = {}
         count = 0
+        
+        tmp_title = ""
+        tmp_content_list = []
+        tmp_res_dict = {}
+        last_k = ""
         for i in content_list:
-            if 'title' in i.lower() or 'slide' in i.lower():
-                tmp_title_key = i.split(":")[-1].replace("Title: ", "")
-                if len(i.lower().replace("slide:", "").replace("title:", "").strip(" ")) > 0:
-                    if tmp_title_key not in track_dict:
-                        slide_contents.append({"title": tmp_title_key, "content": []})
-                        track_dict[tmp_title_key] = count
-                        count += 1
+            if i != '': 
+                if '-' not in i:
+                    tmp_title += i + " "
+                else:
+                    if tmp_title != "" and tmp_title not in tmp_res_dict:
+                        tmp_res_dict[tmp_title] = [i]
+                        last_k = tmp_title
+                        tmp_title = ""
+                    else:
+                        tmp_res_dict[last_k].append(i)
 
-            elif len(i) > 0 and '#' == i[0]:
-                if len(slide_contents) > 0:
-                    slide_contents[track_dict[tmp_title_key]]["content"].append(i.replace('#', '').strip(' '))
-            else:
-                pass
+        for k, v in tmp_res_dict.items():
+            slide_contents.append({"title": k, "content": v})
+
+        print("!"*30)
+        print(tmp_res_dict)
+
+        st.download_button(
+            "Download summarized text",
+            data=summarized_text,
+            file_name='summarized_text.txt',
+            mime='text/plain',
+        )        
+        # for idx, i in enumerate(content_list):
+        #     if '-' not in i.lower():
+        #         # tmp_title_key = i.split(":")[-1].replace("Title: ", "")
+        #         if len(i.lower().replace("slide:", "").replace("title:", "").strip(" ")) > 0:
+        #             # if tmp_title_key not in track_dict:
+        #             slide_contents.append({"title": tmp_title_key, "content": []})
+        #                 # track_dict[tmp_title_key] = count
+        #                 # count += 1
+
+        #     elif len(i) > 0 and '-' == i[0]:
+        #         if len(slide_contents) > 0:
+        #             slide_contents[-1]["content"].append(i.replace('- ', '').strip(' '))
+        #     else:
+        #         pass
 
         tmp_dict = {}
         for i in slide_contents:
@@ -232,14 +332,11 @@ Our system is built on leading technologies:
                 # extract title and content from slide_content
                 title = ""  # use empty string as default value
                 content = slide_content.get('content', [])  # use empty list as default value
-
                 # Check if content is not empty
-                if not content:
-                    st.warning(f'No content for slide title: {title}.')
-                else:
+                if content:
                     valid_slide_contents.append(slide_content)
-
-            if valid_slide_contents:
+            
+            if len(valid_slide_contents) > 0:
                 binary_output = create_ppt(ppt_title, valid_slide_contents, outfile_path="test_ppt.pptx")
                 # display success message
                 # If already summarized once
@@ -248,6 +345,8 @@ Our system is built on leading technologies:
                                     data=binary_output.getvalue(),
                                     file_name="generated.pptx")
 
+            else:
+                st.warning(f'No content for slide title: {title}.')
 
 
     query = st.text_input("Ask questions about your PDF file:")

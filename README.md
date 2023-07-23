@@ -1,5 +1,5 @@
 # GPT Slider
-
+## Public App: (https://slider-creator.streamlit.app/)
 This is an application built using OpenAI, LangChain, and Streamlit to automatically generate PPT slides based on an uploaded thesis paper in PDF format.
 
 ## How to Run

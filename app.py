@@ -15,7 +15,6 @@ from modules.ppt_generation import create_ppt
 from annotated_text import annotated_text, annotation
 import json
 from PIL import Image
-from bokeh.models.widgets import Div
 
 
 im = Image.open("assets/mashpunk.png")
@@ -68,13 +67,6 @@ with st.sidebar:
     
     if history_cost["total_cost"] >= max_cost_limit:
         block_public_api = True
-
-    # badge_html = str(a(href=f"https://www.buymeacoffee.com/qmi0000011")(img(src="https://img.shields.io/badge/Buy%20me%20a%20coffee--yellow.svg?logo=buy-me-a-coffee&logoColor=orange&style=social")))
-    # if st.button('Test'):
-    #     js = "window.open('https://www.buymeacoffee.com/qmi0000011')"  # New tab or window
-    #     html = '<img src onerror="{}">'.format(js)
-    #     div = Div(text=html)
-    #     st.bokeh_chart(div)
 
     html = f"<a href='https://www.buymeacoffee.com/qmi0000011'><img style='max-width: 100%;' src='https://miro.medium.com/v2/resize:fit:1100/format:webp/1*CEZSIxeYr6PCxsN6Gr38MQ.png'></a>"
     st.markdown(html, unsafe_allow_html=True)

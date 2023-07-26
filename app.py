@@ -17,7 +17,7 @@ import json
 from PIL import Image
 
 
-im = Image.open("assets/mashpunk.png")
+im = Image.open("assets/main_icon.jpg")
 
 st.set_page_config(
     page_title="GPT Slide Creator",

@@ -48,6 +48,6 @@ def update_budget_parameter(mycol, parameter, new_val):
 def update_user_QA(coll, member_id, new_filename, new_question, new_answer):
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")
     coll.update_one({'member_id': member_id}, {'$push': {'qa_timestamp': timestamp}})
-    coll.update_one({'member_id': member_id}, {'$push': {'questions': new_filename}})
+    coll.update_one({'member_id': member_id}, {'$push': {'filename': new_filename}})
     coll.update_one({'member_id': member_id}, {'$push': {'questions': new_question}})
     coll.update_one({'member_id': member_id}, {'$push': {'response': new_answer}})

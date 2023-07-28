@@ -21,8 +21,9 @@ from modules.pymongo_functions import (test_connection,
                                       get_collection,
                                       add_doc,
                                       match_doc,
-                                      get_parameter,
-                                      update_parameter
+                                      get_budget_parameter,
+                                      update_budget_parameter,
+                                      update_user_QA
                                       )
 
 
@@ -36,14 +37,16 @@ st.set_page_config(
 )
 
 
+# Impoact DB
 db_username = st.secrets["db_username"]
 db_pswd = st.secrets["db_pswd"]
-
 uri = f"mongodb+srv://{db_username}:{db_pswd}@sushigo.ynrtvfi.mongodb.net/"
 client = MongoClient(uri, server_api=ServerApi('1'))
 budget_col = get_collection(client, "budget")
-history_cost = get_parameter(budget_col, "total_cost")
-max_cost_limit = get_parameter(budget_col, "max_limit")
+member_col = get_collection(client, "members")
+
+history_cost = get_budget_parameter(budget_col, "total_cost")
+max_cost_limit = get_budget_parameter(budget_col, "max_limit")
 
 block_public_api = False
 
@@ -77,7 +80,7 @@ with st.sidebar:
     #     if i == min(max_cost_limit, history_cost):
     #         break
 
-    st.progress(history_cost/max_cost_limit, text=f"{history_cost/max_cost_limit * 100}%")
+    st.progress(history_cost/max_cost_limit, text=f"{round(history_cost/max_cost_limit * 100, 1)}%")
 
     st.markdown(f"""
     ## Usage in this session
@@ -339,10 +342,10 @@ def main():
                     # Get cost
                     cost_dict["summary"] = float(summarized_total_tokens)/1000*0.004
                     # history_cost = json.load(open("total_cost.json", "r"))
-                    history_cost = get_parameter(budget_col, "total_cost")
+                    history_cost = get_budget_parameter(budget_col, "total_cost")
                     history_cost += cost_dict["summary"] 
                     # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
-                    update_parameter(budget_col, "total_cost", history_cost)
+                    update_budget_parameter(budget_col, "total_cost", history_cost)
                     
                     update_session_cost(cost_dict["summary"])
 
@@ -385,10 +388,10 @@ def main():
             slides, slides_total_tokens = auto_generate_slides(input_text)
             cost_dict["slides"] = float(slides_total_tokens)/1000*0.004
             # history_cost = json.load(open("total_cost.json", "r"))
-            history_cost = get_parameter(budget_col, "total_cost")
+            history_cost = get_budget_parameter(budget_col, "total_cost")
             history_cost += cost_dict["slides"] 
             # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
-            update_parameter(budget_col, "total_cost", history_cost)
+            update_budget_parameter(budget_col, "total_cost", history_cost)
             update_session_cost(cost_dict["slides"])
 
             with st.expander("Click to see the content of the slides"):
@@ -508,13 +511,16 @@ def main():
                 response = chain.run(input_documents=docs, question=query)
                 QA_total_tokens = cb.total_tokens
 
+                # Default member id to public for now
+                update_user_QA(member_col, 2, query, response)
+
                 if QA_total_tokens > 0:
                     cost_dict["QA"] = float(QA_total_tokens)/1000*0.004 
                     # history_cost = json.load(open("total_cost.json", "r"))
-                    history_cost = get_parameter(budget_col, "total_cost")
+                    history_cost = get_budget_parameter(budget_col, "total_cost")
                     history_cost += cost_dict["QA"] 
                     # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
-                    update_parameter(budget_col, "total_cost", history_cost)
+                    update_budget_parameter(budget_col, "total_cost", history_cost)
                     update_session_cost(cost_dict["QA"])
 
             st.write(response)

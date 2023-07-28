@@ -1,5 +1,7 @@
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+import datetime
+
 
 def test_connection(client):
     # Send a ping to confirm a successful connection
@@ -34,11 +36,18 @@ def view_all_docs(mycol, max_items=100):
     for document in cursor[:max_items]:
         print(document) 
 
-def get_parameter(mycol, parameter):
+def get_budget_parameter(mycol, parameter):
     res = mycol.find_one({"parameter": parameter})
     return res['value']
 
-def update_parameter(mycol, parameter, new_val):
+def update_budget_parameter(mycol, parameter, new_val):
     mycol.update_one({"parameter": parameter}, 
                         {"$set": {"value": new_val}}
                         )
+    
+def update_user_QA(coll, member_id, new_filename, new_question, new_answer):
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")
+    coll.update_one({'member_id': member_id}, {'$push': {'qa_timestamp': timestamp}})
+    coll.update_one({'member_id': member_id}, {'$push': {'questions': new_filename}})
+    coll.update_one({'member_id': member_id}, {'$push': {'questions': new_question}})
+    coll.update_one({'member_id': member_id}, {'$push': {'response': new_answer}})

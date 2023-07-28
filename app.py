@@ -15,6 +15,15 @@ from modules.ppt_generation import create_ppt
 from annotated_text import annotated_text, annotation
 import json
 from PIL import Image
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from modules.pymongo_functions import (test_connection,
+                                      get_collection,
+                                      add_doc,
+                                      match_doc,
+                                      get_parameter,
+                                      update_parameter
+                                      )
 
 
 im = Image.open("assets/main_icon.jpg")
@@ -26,11 +35,21 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
+
+db_username = st.secrets["db_username"]
+db_pswd = st.secrets["db_pswd"]
+
+uri = f"mongodb+srv://{db_username}:{db_pswd}@sushigo.ynrtvfi.mongodb.net/"
+client = MongoClient(uri, server_api=ServerApi('1'))
+budget_col = get_collection(client, "budget")
+history_cost = get_parameter(budget_col, "total_cost")
+max_cost_limit = get_parameter(budget_col, "max_limit")
+
 block_public_api = False
 
 # Sidebar contents
-max_cost_limit = 20
-history_cost = json.load(open("total_cost.json", "r"))
+# max_cost_limit = 20
+# history_cost = json.load(open("total_cost.json", "r"))
 
 with st.sidebar:
     st.title('🧠 GPT Slide Creator 🧠')
@@ -51,21 +70,21 @@ with st.sidebar:
     [Feedback]()
 
     ## Current usage
-    {history_cost["total_cost"]} / {max_cost_limit}
+    {round(history_cost, 3)} / {max_cost_limit}
 
     ''')
     # for i in stqdm(range(max_cost_limit), st_container=st.sidebar):
-    #     if i == min(max_cost_limit, history_cost["total_cost"]):
+    #     if i == min(max_cost_limit, history_cost):
     #         break
 
-    st.progress(history_cost["total_cost"]/20, text="")
+    st.progress(history_cost/max_cost_limit, text=f"{history_cost/max_cost_limit * 100}%")
 
     st.markdown(f"""
     ## Usage in this session
-    {0 if "gpt_api_cost" not in st.session_state else st.session_state["gpt_api_cost"]}
+    {0 if "gpt_api_cost" not in st.session_state else round(st.session_state["gpt_api_cost"], 3)}
     """)
     
-    if history_cost["total_cost"] >= max_cost_limit:
+    if history_cost >= max_cost_limit:
         block_public_api = True
 
     html = f"<a href='https://www.buymeacoffee.com/qmi0000011'><img style='max-width: 100%;' src='https://miro.medium.com/v2/resize:fit:1100/format:webp/1*CEZSIxeYr6PCxsN6Gr38MQ.png'></a>"
@@ -319,9 +338,12 @@ def main():
                     summarized_text_initial, summarized_total_tokens = process_text(text_cleaned, file_path="sum1.txt")
                     # Get cost
                     cost_dict["summary"] = float(summarized_total_tokens)/1000*0.004
-                    history_cost = json.load(open("total_cost.json", "r"))
-                    history_cost["total_cost"] += cost_dict["summary"] 
-                    json.dump({"total_cost": history_cost["total_cost"]}, open("total_cost.json", "w"))
+                    # history_cost = json.load(open("total_cost.json", "r"))
+                    history_cost = get_parameter(budget_col, "total_cost")
+                    history_cost += cost_dict["summary"] 
+                    # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
+                    update_parameter(budget_col, "total_cost", history_cost)
+                    
                     update_session_cost(cost_dict["summary"])
 
                     summarized_text_grouped = organize_text_2(summarized_text_initial)
@@ -362,9 +384,11 @@ def main():
             # Use the first 10 lines as input to auto_generate_slides
             slides, slides_total_tokens = auto_generate_slides(input_text)
             cost_dict["slides"] = float(slides_total_tokens)/1000*0.004
-            history_cost = json.load(open("total_cost.json", "r"))
-            history_cost["total_cost"] += cost_dict["slides"] 
-            json.dump({"total_cost": history_cost["total_cost"]}, open("total_cost.json", "w"))
+            # history_cost = json.load(open("total_cost.json", "r"))
+            history_cost = get_parameter(budget_col, "total_cost")
+            history_cost += cost_dict["slides"] 
+            # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
+            update_parameter(budget_col, "total_cost", history_cost)
             update_session_cost(cost_dict["slides"])
 
             with st.expander("Click to see the content of the slides"):
@@ -486,9 +510,11 @@ def main():
 
                 if QA_total_tokens > 0:
                     cost_dict["QA"] = float(QA_total_tokens)/1000*0.004 
-                    history_cost = json.load(open("total_cost.json", "r"))
-                    history_cost["total_cost"] += cost_dict["QA"] 
-                    json.dump({"total_cost": history_cost["total_cost"]}, open("total_cost.json", "w"))
+                    # history_cost = json.load(open("total_cost.json", "r"))
+                    history_cost = get_parameter(budget_col, "total_cost")
+                    history_cost += cost_dict["QA"] 
+                    # json.dump({"total_cost": history_cost}, open("total_cost.json", "w"))
+                    update_parameter(budget_col, "total_cost", history_cost)
                     update_session_cost(cost_dict["QA"])
 
             st.write(response)

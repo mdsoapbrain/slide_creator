@@ -512,7 +512,7 @@ def main():
                 QA_total_tokens = cb.total_tokens
 
                 # Default member id to public for now
-                update_user_QA(member_col, 2, query, response)
+                update_user_QA(member_col, 2, store_name, query, response)
 
                 if QA_total_tokens > 0:
                     cost_dict["QA"] = float(QA_total_tokens)/1000*0.004 
